@@ -97,6 +97,7 @@ docker compose logs -f --tail=200
 - 查询登录设备/IP
 - 查询在线播放人数
 - 到期账号自动删除并通知管理员
+![图片描述](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8833.3626359q3h.jpeg)
 
 ## 客户端 Bot 功能
 
@@ -105,6 +106,7 @@ docker compose logs -f --tail=200
 - 查询我的到期时间
 - 查询在线播放人数
 - 一键联系管理员
+![图片描述](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8834.2dpaletb6n.jpeg)
 
 ## 资源建议
 
