@@ -6,7 +6,7 @@
 - 提供 **管理员 1 号 Telegram Bot**
 - 提供 **客户端 2 号 Telegram Bot**
 - 使用 **SQLite + WAL** 保存本地用户信息、注册码、到期时间
-- 不提供对外 Web 面板，默认只使用两个 Telegram 机器人
+- 为了emby服务器安全问题，不提供对外 Web 面板，默认只使用两个 Telegram 机器人
 - 所有 Emby 操作都走 **HTTP API**，不直接碰 Emby 数据库，避免锁库
 
 ## 重要说明
@@ -110,5 +110,5 @@ docker compose logs -f --tail=200
 
 ## 资源建议
 
-2C2G40G 完全足够跑这个项目！打赏一下😁
+1c1g 完全足够跑这个项目！打赏一下😁
 ![打赏一下](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8831.362632xhlz.jpeg)
