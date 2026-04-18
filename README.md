@@ -109,3 +109,4 @@ docker compose logs -f --tail=200
 ## 资源建议
 
 2C2G40G 完全足够跑这个项目，建议同机部署，不要和大量转码业务混跑.
+!{如果对您有帮助，发个小红包打赏一下}(https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8831.362632xhlz.jpeg)
