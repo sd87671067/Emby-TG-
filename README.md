@@ -148,7 +148,7 @@ cp .env.example .env
 - 📱 查询登录设备/IP
 - ▶️ 查询在线播放人数
 - ⏰ 账号过期自动删除并通知管理员
-
+![IMG_8835](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8835.4clhcpmf9f.jpeg)
 ## 客户端 Bot 功能
 
 - 📝 注册账号
@@ -158,7 +158,7 @@ cp .env.example .env
 - 📞 联系管理员
 - 账号到期前 3 天自动提醒一次
 - 注册成功 / 续期成功后通知管理员机器人
-
+![IMG_8836](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8836.6t7prmtjsd.jpeg)
 ## 最新修复
 
 ### v14
@@ -183,4 +183,6 @@ cp .env.example .env
 
 ## 资源建议
 
-2C2G40G 完全足够跑这个项目，建议同机部署，不要和大量转码业务混跑。
+1c2g 完全足够跑这个项目，打赏一下，老板请我喝杯咖啡吗
+![IMG_8831](https://github.com/sd87671067/picx-images-hosting/raw/master/IMG_8831.362632xhlz.jpeg)
+
