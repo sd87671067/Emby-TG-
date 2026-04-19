@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     EMBY_TEMPLATE_USER: str = "testone"
     EMBY_IMPORT_IGNORE_USERNAMES: str = "admin"
     EMBY_SYNC_LOCAL_DEFAULT_PASSWORD: str = "1234"
+    EMBY_PUSH_SYNC_DELAY_SECONDS: float = 0.6
 
     ADMIN_BOT_TOKEN: str = ""
     ADMIN_CHAT_IDS: str = ""
@@ -42,7 +43,7 @@ class Settings(BaseSettings):
     CODE_BATCH_LIMIT: int = 500
     WEB_EXPIRING_SOON_DAYS: int = 3
 
-    EXPIRY_CHECK_SECONDS: int = 300
+    EXPIRY_CHECK_SECONDS: int = 3600
     ONLINE_CHECK_SECONDS: int = 60
 
     DATA_DIR: str = "/data"

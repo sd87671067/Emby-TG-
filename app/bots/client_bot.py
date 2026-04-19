@@ -19,6 +19,9 @@ from ..services.user_service import (
     create_registered_user,
     get_local_user_by_username,
     get_or_repair_local_user_by_tg_user_id,
+    renew_user_with_code,
+    notify_admin_register_success,
+    notify_admin_renew_success,
 )
 from ..utils import fmt_expire, is_valid_username
 from .shared import client_main_keyboard, contact_admin_inline
@@ -30,6 +33,7 @@ logger = logging.getLogger("app.client_bot")
 class ClientStates(StatesGroup):
     waiting_code = State()
     waiting_account_password = State()
+    waiting_renew_code = State()
 
 
 def build_client_bot(
@@ -59,23 +63,28 @@ def build_client_bot(
             reply_markup=client_main_keyboard(),
         )
 
+    @router.message(Command("cancel"))
+    async def cancel(message: Message, state: FSMContext) -> None:
+        await state.clear()
+        await message.answer("已取消。", reply_markup=client_main_keyboard())
+
     @router.message(Command("start"))
     async def start(message: Message, state: FSMContext) -> None:
         await state.clear()
         await send_home(message, "欢迎使用 Emby 客户端机器人。\n请点击下方按钮。")
 
-    @router.message(F.text == "我的账号")
+    @router.message(F.text == "👤 我的账号")
     async def my_account(message: Message, state: FSMContext) -> None:
         await state.clear()
         await send_my_account(message)
 
-    @router.message(F.text == "在线播放人数")
+    @router.message(F.text == "▶️ 在线播放人数")
     async def now_playing(message: Message, state: FSMContext) -> None:
         await state.clear()
         count = await emby_client.get_now_playing_count()
         await message.answer(f"当前 Emby 在线播放人数：<b>{count}</b>", reply_markup=client_main_keyboard())
 
-    @router.message(F.text == "联系管理员")
+    @router.message(F.text == "📞 联系管理员")
     async def contact_admin(message: Message, state: FSMContext) -> None:
         await state.clear()
         markup = contact_admin_inline(settings)
@@ -84,23 +93,64 @@ def build_client_bot(
         else:
             await message.answer("管理员尚未配置联系方式。", reply_markup=client_main_keyboard())
 
-    @router.message(F.text == "注册账号")
+    @router.message(F.text == "📝 注册账号")
     async def ask_code(message: Message, state: FSMContext) -> None:
         async with session_factory() as session:
             user = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
         if user:
-            await message.answer("你已经注册过账号了，可直接点“我的账号”查询。", reply_markup=client_main_keyboard())
+            await state.clear()
+            await message.answer("您已经存在一个有效账号。", reply_markup=client_main_keyboard())
             return
         await state.set_state(ClientStates.waiting_code)
-        await message.answer("请输入注册码。验证成功后，才会进入下一步。")
+        await message.answer("请输入注册码。验证成功后，才会进入下一步。\n发送 /cancel 可取消。")
+
+    @router.message(F.text == "🎟️ 使用注册码/续期码")
+    async def ask_renew_code(message: Message, state: FSMContext) -> None:
+        async with session_factory() as session:
+            user = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
+        if not user:
+            await state.clear()
+            await message.answer("请先注册账号。", reply_markup=client_main_keyboard())
+            return
+        await state.set_state(ClientStates.waiting_renew_code)
+        await message.answer("请输入注册码/续期码。\n发送 /cancel 可取消。")
+
+    @router.message(ClientStates.waiting_renew_code)
+    async def input_renew_code(message: Message, state: FSMContext) -> None:
+        code = (message.text or "").strip()
+        async with session_factory() as session:
+            user = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
+            if not user:
+                await state.clear()
+                await message.answer("请先注册账号。", reply_markup=client_main_keyboard())
+                return
+            invite = await validate_code(session, code)
+            if not invite:
+                await message.answer("注册码/续期码无效或已被使用，请重新输入。\n发送 /cancel 可取消。")
+                return
+            user = await renew_user_with_code(session, username=user.username, tg_user_id=message.from_user.id, code=code)
+            await add_audit(session, "client_bot", "renew_user_with_code", f"{user.username}, days={invite.expire_days}")
+            await session.commit()
+        await message.answer(
+            f"🎉 恭喜您续期成功\n账号到期时间为 <b>{fmt_expire(user.expire_at)}</b>",
+            reply_markup=client_main_keyboard(),
+        )
+        await notify_admin_renew_success(settings, user.username, fmt_expire(user.expire_at))
+        await state.clear()
 
     @router.message(ClientStates.waiting_code)
     async def input_code(message: Message, state: FSMContext) -> None:
+        async with session_factory() as session:
+            exists_tg = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
+        if exists_tg:
+            await state.clear()
+            await message.answer("您已经存在一个有效账号。", reply_markup=client_main_keyboard())
+            return
         code = (message.text or "").strip()
         async with session_factory() as session:
             invite = await validate_code(session, code)
         if not invite:
-            await message.answer("注册码无效或已被使用，请重新输入，或点击其他菜单返回主界面。")
+            await message.answer("注册码无效或已被使用，请重新输入，或点击其他菜单返回主界面。\n发送 /cancel 可取消。")
             return
         await state.update_data(invite_code=code, invite_expire_days=invite.expire_days)
         await state.set_state(ClientStates.waiting_account_password)
@@ -108,7 +158,8 @@ def build_client_bot(
             f"注册码验证成功，有效期 <b>{invite.expire_days}</b> 天。\n"
             "请输入：<b>账号 空格 密码</b>\n"
             "账号只能英文+数字。\n"
-            "密码可为空；如果要留空，直接只输入账号即可。"
+            "密码可为空；如果要留空，直接只输入账号即可。\n"
+            "发送 /cancel 可取消。"
         )
 
     @router.message(ClientStates.waiting_account_password)
@@ -126,15 +177,15 @@ def build_client_bot(
             return
 
         async with session_factory() as session:
+            exists_tg = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
+            if exists_tg:
+                await message.answer("您已经存在一个有效账号。", reply_markup=client_main_keyboard())
+                await state.clear()
+                return
+
             exists_name = await get_local_user_by_username(session, username)
             if exists_name:
                 await message.answer("该账号名已存在，请换一个。")
-                return
-
-            exists_tg = await get_or_repair_local_user_by_tg_user_id(session, message.from_user.id)
-            if exists_tg:
-                await message.answer("你的 Telegram 已绑定账号，不能重复注册。", reply_markup=client_main_keyboard())
-                await state.clear()
                 return
 
             data = await state.get_data()
@@ -180,12 +231,12 @@ def build_client_bot(
                 return
 
         await message.answer(
-            "注册成功。\n"
-            f"账号：<b>{user.username}</b>\n"
-            f"到期时间：<b>{fmt_expire(user.expire_at)}</b>\n"
+            "🎉 恭喜您注册成功\n"
+            f"账号到期时间为 <b>{fmt_expire(user.expire_at)}</b>\n"
             f"服务地址：<b>{settings.EMBY_SERVER_PUBLIC_URL}</b>",
             reply_markup=client_main_keyboard(),
         )
+        await notify_admin_register_success(settings, user.username, fmt_expire(user.expire_at))
         await state.clear()
 
     @router.message()
@@ -193,11 +244,7 @@ def build_client_bot(
         await send_home(message, "请点击下方菜单按钮。")
 
     async def post_init() -> None:
-        await bot.set_my_commands(
-            [
-                BotCommand(command="start", description="打开主菜单"),
-            ]
-        )
+        await bot.set_my_commands([BotCommand(command="start", description="打开主菜单")])
         try:
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         except Exception as exc:

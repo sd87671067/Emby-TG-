@@ -17,9 +17,7 @@ class EmbyError(Exception):
 
 
 class EmbyClient:
-    """
-    只通过 Emby HTTP API 通信，不直接访问 Emby 的 sqlite/db 文件，避免锁库。
-    """
+    """只通过 Emby HTTP API 通信，不直接访问 Emby sqlite/db 文件，避免锁库。"""
 
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -71,11 +69,7 @@ class EmbyClient:
         await self._request("POST", f"/Users/{user_id}/Delete")
 
     async def update_user_password(self, user_id: str, new_password: str) -> None:
-        body = {
-            "Id": user_id,
-            "NewPw": new_password,
-            "ResetPassword": False,
-        }
+        body = {"Id": user_id, "NewPw": new_password, "ResetPassword": False}
         await self._request("POST", f"/Users/{user_id}/Password", json=body)
 
     async def update_user_policy(self, user_id: str, policy: dict[str, Any]) -> None:
@@ -115,11 +109,7 @@ class EmbyClient:
 
     async def get_now_playing_count(self) -> int:
         sessions = await self.get_sessions()
-        count = 0
-        for item in sessions:
-            if item.get("NowPlayingItem"):
-                count += 1
-        return count
+        return sum(1 for item in sessions if item.get("NowPlayingItem"))
 
     async def get_login_device_rows(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

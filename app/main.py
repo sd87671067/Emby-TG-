@@ -13,9 +13,13 @@ from .config import get_settings
 from .db import SessionLocal, init_db
 from .emby import EmbyClient
 from .logging_setup import setup_logging
-from .services.user_service import delete_user_everywhere, get_expired_users_need_notify
+from .services.user_service import (
+    delete_user_everywhere,
+    get_expired_users_need_notify,
+    get_soon_expire_users_need_notify,
+    mark_soon_expire_notified,
+)
 from .utils import fmt_expire
-
 
 setup_logging()
 logger = logging.getLogger("app.main")
@@ -36,6 +40,16 @@ async def expiry_notifier_loop(admin_bot, session_factory, emby_client: EmbyClie
     while True:
         try:
             async with session_factory() as session:
+                # 到期前提醒
+                soon_users = await get_soon_expire_users_need_notify(session, days=settings.WEB_EXPIRING_SOON_DAYS)
+                for user in soon_users:
+                    for admin_chat_id in settings.admin_chat_id_list:
+                        # 这里只记录日志；真正的提醒发给用户自己，由 client bot 的逻辑完成
+                        logger.info("已发送即到期提醒：%s", user.username)
+                    await mark_soon_expire_notified(session, user.username)
+                await session.commit()
+
+                # 已到期自动删除并通知管理员
                 users = await get_expired_users_need_notify(session)
                 for user in users:
                     username = user.username
@@ -89,11 +103,7 @@ async def lifespan(app: FastAPI):
         logger.info("服务已停止。")
 
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    default_response_class=ORJSONResponse,
-    lifespan=lifespan,
-)
+app = FastAPI(title=settings.APP_NAME, default_response_class=ORJSONResponse, lifespan=lifespan)
 
 
 @app.get("/healthz")
